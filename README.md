@@ -19,7 +19,7 @@ En NutriVida, creemos que la **nutrición** es el pilar de una vida plena. Nuest
 
 Haz clic en el siguiente enlace para acceder a la **plataforma de registro** y comenzar tu viaje:
 
-[👉 Regístrate en NutriVida Ahora](https://www.nutrivida.com/registro)
+[👉 Regístrate en NutriVida Ahora]([https://aminbena010-ai.github.io/NutriTrack/])
 
 ---
 
@@ -27,9 +27,7 @@ Haz clic en el siguiente enlace para acceder a la **plataforma de registro** y c
 
 Si eres un desarrollador o quieres integrar nuestro *widget* de cálculo de IMC en tu propia página web, simplemente copia el siguiente comando o fragmento de código:
 
-\`\`\`html
-<iframe src="https://www.nutrivida.com/widgets/imc" width="300" height="450" frameborder="0"></iframe>
-\`\`\`
+
 
 **Instrucción:** Copia el código anterior y pégalo en el HTML de tu página donde desees que aparezca la calculadora de **Índice de Masa Corporal (IMC)**.
 
