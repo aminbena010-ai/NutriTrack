@@ -1,0 +1,1698 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mi Nutrición Diaria - Dashboard</title>
+    
+    <!-- Carga de Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- ************************************ -->
+    <!-- CONFIGURACIÓN DE TAILWIND -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'primary-green': '#10B981',       /* Verde Esmeralda (Principal/Salud) */
+                        'light-green': '#A7F3D0',         /* Verde Claro (Acentos/Hover) */
+                        'bg-light': '#f7f7f7',            /* Blanco Roto/Gris muy claro */
+                        'accent-light': '#E0F2F1',        /* Verde muy claro para fondo de hover */
+                        'danger-red': '#EF4444',          /* Para mensajes de error */
+                        'success-blue': '#3B82F6',        /* Para botones de edición */
+                        'warning-orange': '#F59E0B',      /* Para planes/rutinas */
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- ************************************ -->
+
+    <!-- Carga de Chart.js y Lucide Icons -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script type="module" src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        /* Estilos base para la aplicación */
+        body {
+            background-color: #f7f7f7;
+            font-family: 'Arial', 'sans-serif';
+        }
+        .main-container {
+            min-height: calc(100vh - 80px); /* Ajuste para el footer móvil */
+        }
+        /* Ocultar barra de desplazamiento en elementos que no son el cuerpo */
+        ::-webkit-scrollbar {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Contenedor Principal de la Aplicación -->
+    <div id="app-container" class="relative">
+
+        <!-- Barra de Navegación Superior (Escritorio) -->
+        <header class="bg-white shadow-sm sticky top-0 z-10 hidden sm:block">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
+                <div class="flex items-center space-x-2">
+                    <i data-lucide="leaf" class="w-8 h-8 text-primary-green"></i>
+                    <h1 class="text-2xl font-bold text-gray-800">Nutri<span class="text-primary-green">Diaria</span></h1>
+                </div>
+                <!-- Menú de Navegación Principal -->
+                <nav class="flex space-x-6">
+                    <a id="nav-Inicio" href="#" onclick="event.preventDefault(); renderView('Inicio')" class="text-gray-500 hover:text-primary-green transition duration-150 py-2 border-b-2 border-transparent">Inicio</a>
+                    <a id="nav-Registro" href="#" onclick="event.preventDefault(); renderView('Registro')" class="text-gray-500 hover:text-primary-green transition duration-150 py-2 border-b-2 border-transparent">Registro</a>
+                    <a id="nav-Progreso" href="#" onclick="event.preventDefault(); renderView('Progreso')" class="text-gray-500 hover:text-primary-green transition duration-150 py-2 border-b-2 border-transparent">Progreso</a>
+                    <a id="nav-Planes" href="#" onclick="event.preventDefault(); renderView('Planes')" class="text-gray-500 hover:text-primary-green transition duration-150 py-2 border-b-2 border-transparent">Planes</a>
+                    <a id="nav-Perfil" href="#" onclick="event.preventDefault(); renderView('Perfil')" class="text-gray-500 hover:text-primary-green transition duration-150 py-2 border-b-2 border-transparent">Perfil</a>
+                </nav>
+            </div>
+        </header>
+
+        <!-- Indicador de Carga (Simplificado para Local Storage) -->
+        <div id="loading-indicator" class="fixed inset-0 bg-bg-light z-50 flex items-center justify-center hidden">
+            <div class="flex flex-col items-center">
+                <i data-lucide="loader-circle" class="w-10 h-10 text-primary-green animate-spin"></i>
+                <p class="mt-4 text-gray-600 font-medium">Cargando datos locales...</p>
+                <p id="error-message" class="mt-2 text-danger-red text-sm"></p>
+            </div>
+        </div>
+
+        <!-- Contenido Principal de la SPA -->
+        <main id="main-content" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10 main-container hidden">
+
+            <!-- Vista 1: Inicio (Dashboard) -->
+            <div id="view-Inicio" class="hidden">
+                <h2 class="text-3xl font-extrabold text-gray-900 mb-6">Panel Principal</h2>
+                <p class="text-gray-600 mb-8">Resumen rápido de tu actividad nutricional diaria y semanal.</p>
+
+                <!-- Panel de Métricas Clave Hoy -->
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                    <!-- Calorías Hoy -->
+                    <div class="bg-white p-5 rounded-xl shadow-lg border-b-4 border-primary-green/70">
+                        <div class="flex items-center space-x-2 text-gray-500">
+                            <i data-lucide="flame" class="w-5 h-5"></i>
+                            <span class="text-xs font-semibold uppercase">Calorías Hoy</span>
+                        </div>
+                        <p id="metric-total-calories" class="text-3xl font-bold text-gray-900 mt-2">0</p>
+                        <p class="text-sm text-gray-500">kcal registradas</p>
+                    </div>
+                    <!-- Proteína Hoy -->
+                    <div class="bg-white p-5 rounded-xl shadow-lg border-b-4 border-yellow-500/70">
+                        <div class="flex items-center space-x-2 text-gray-500">
+                            <i data-lucide="dumbbell" class="w-5 h-5"></i>
+                            <span class="text-xs font-semibold uppercase">Proteína Hoy</span>
+                        </div>
+                        <p id="metric-total-food" class="text-3xl font-bold text-gray-900 mt-2">0</p>
+                        <p class="text-sm text-gray-500">g consumidos</p>
+                    </div>
+                    <!-- Grasas Hoy -->
+                    <div class="bg-white p-5 rounded-xl shadow-lg border-b-4 border-red-500/70">
+                        <div class="flex items-center space-x-2 text-gray-500">
+                            <i data-lucide="droplets" class="w-5 h-5"></i>
+                            <span class="text-xs font-semibold uppercase">Grasa Hoy</span>
+                        </div>
+                        <p id="metric-total-fat" class="text-3xl font-bold text-gray-900 mt-2">0</p>
+                        <p class="text-sm text-gray-500">g consumidos</p>
+                    </div>
+                    <!-- Carbohidratos Hoy -->
+                    <div class="bg-white p-5 rounded-xl shadow-lg border-b-4 border-blue-500/70">
+                        <div class="flex items-center space-x-2 text-gray-500">
+                            <i data-lucide="pizza" class="w-5 h-5"></i>
+                            <span class="text-xs font-semibold uppercase">Carbs Hoy</span>
+                        </div>
+                        <p id="metric-total-carbs" class="text-3xl font-bold text-gray-900 mt-2">0</p>
+                        <p class="text-sm text-gray-500">g consumidos</p>
+                    </div>
+                </div>
+
+                <!-- Gráfico de Resumen Semanal y Rutina/Última Comida -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <!-- Gráfico Semanal -->
+                    <div class="lg:col-span-2 bg-white p-6 rounded-xl shadow-lg">
+                        <h2 class="text-xl font-semibold mb-4 text-gray-800">Resumen Semanal de Calorías</h2>
+                        <div class="h-64 sm:h-80">
+                            <canvas id="weeklySummaryChart"></canvas>
+                        </div>
+                    </div>
+                    <!-- Rutina Recomendada para Hoy / Última Comida Registrada -->
+                    <div id="latest-meal-container" class="lg:col-span-1 bg-white p-6 rounded-xl shadow-lg">
+                        <!-- El contenido se inyecta por JS (renderDashboard) -->
+                        <div class="bg-accent-light p-4 rounded-xl text-center text-primary-green font-medium">
+                            Cargando...
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Vista 2: Registro -->
+            <div id="view-Registro" class="hidden">
+                <h2 class="text-3xl font-extrabold text-gray-900 mb-6">Nuevo Registro de Comida</h2>
+                <p class="text-gray-600 mb-8">Ingresa los detalles de tu comida para llevar un seguimiento preciso.</p>
+
+                <div class="max-w-2xl bg-white p-6 sm:p-8 rounded-xl shadow-2xl">
+                    <form onsubmit="submitMeal(event)">
+                        
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                            <!-- Nombre del Plato -->
+                            <div>
+                                <label for="input-food" class="block text-sm font-medium text-gray-700 mb-1">Nombre del Plato / Alimento</label>
+                                <input type="text" id="input-food" name="food" placeholder="Ej: Pechuga de pollo con ensalada" required class="w-full p-3 border border-gray-300 rounded-lg focus:ring-primary-green focus:border-primary-green" oninput="autofillMacros(this.value)">
+                            </div>
+                            
+                            <!-- Tipo de Comida -->
+                            <div>
+                                <label for="input-type" class="block text-sm font-medium text-gray-700 mb-1">Tipo de Comida</label>
+                                <select id="input-type" name="type" required class="w-full p-3 border border-gray-300 rounded-lg focus:ring-primary-green focus:border-primary-green bg-white">
+                                    <option value="Desayuno">Desayuno</option>
+                                    <option value="Almuerzo">Almuerzo</option>
+                                    <option value="Cena">Cena</option>
+                                    <option value="Snack">Snack</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4 mb-6">
+                             <!-- Fecha -->
+                            <div>
+                                <label for="input-date" class="block text-sm font-medium text-gray-700 mb-1 flex items-center"><i data-lucide="calendar" class="w-4 h-4 mr-2 text-primary-green"></i>Fecha</label>
+                                <input type="date" id="input-date" name="date" required class="w-full p-3 border border-gray-300 rounded-lg focus:ring-primary-green focus:border-primary-green">
+                            </div>
+                            
+                            <!-- Hora -->
+                            <div>
+                                <label for="input-time" class="block text-sm font-medium text-gray-700 mb-1 flex items-center"><i data-lucide="clock" class="w-4 h-4 mr-2 text-primary-green"></i>Hora</label>
+                                <input type="time" id="input-time" name="time" required class="w-full p-3 border border-gray-300 rounded-lg focus:ring-primary-green focus:border-primary-green">
+                            </div>
+                        </div>
+                        
+                        <!-- Notas (Campo Opcional) -->
+                        <div class="mb-6">
+                            <label for="input-note" class="block text-sm font-medium text-gray-700 mb-1">Notas (Opcional)</label>
+                            <textarea id="input-note" name="note" rows="3" placeholder="Ej: Hecho con aceite de oliva. Reducir sal la próxima vez." class="w-full p-3 border border-gray-300 rounded-lg focus:ring-primary-green focus:border-primary-green"></textarea>
+                        </div>
+
+
+                        <h3 class="text-lg font-bold text-primary-green border-t border-gray-200 pt-4 mt-4 mb-4">Detalles Nutricionales (Porciones en gramos)</h3>
+                        
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                            <!-- Calorías -->
+                            <div>
+                                <label for="input-calories" class="block text-sm font-medium text-gray-700 mb-1">Calorías (kcal)</label>
+                                <input type="number" id="input-calories" name="calories" required min="0" placeholder="0" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-primary-green focus:border-primary-green">
+                            </div>
+                            <!-- Proteínas -->
+                            <div>
+                                <label for="input-protein" class="block text-sm font-medium text-gray-700 mb-1">Proteínas (g)</label>
+                                <input type="number" id="input-protein" name="protein" required min="0" placeholder="0" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-primary-green focus:border-primary-green">
+                            </div>
+                            <!-- Grasas -->
+                            <div>
+                                <label for="input-fat" class="block text-sm font-medium text-gray-700 mb-1">Grasas (g)</label>
+                                <input type="number" id="input-fat" name="fat" required min="0" placeholder="0" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-primary-green focus:border-primary-green">
+                            </div>
+                            <!-- Carbohidratos -->
+                            <div>
+                                <label for="input-carbs" class="block text-sm font-medium text-gray-700 mb-1">Carbohidratos (g)</label>
+                                <input type="number" id="input-carbs" name="carbs" required min="0" placeholder="0" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-primary-green focus:border-primary-green">
+                            </div>
+                        </div>
+
+                        <button type="submit" class="w-full p-3 bg-primary-green text-white font-bold rounded-lg hover:bg-green-700 transition duration-200 shadow-xl shadow-primary-green/40 flex items-center justify-center space-x-2 mt-6">
+                            <i data-lucide="plus-circle" class="w-5 h-5"></i>
+                            <span>Registrar Comida</span>
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Vista 3: Progreso (Historial y Gráfico Acumulado) -->
+            <div id="view-Progreso" class="hidden">
+                <h2 class="text-3xl font-extrabold text-gray-900 mb-6">Tu Progreso e Historial</h2>
+                <p class="text-gray-600 mb-8">Visualiza tu consumo acumulado y gestiona tu historial de registros.</p>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <!-- Gráfico de Progreso Acumulado -->
+                    <div class="lg:col-span-2 bg-white p-6 rounded-xl shadow-lg">
+                        <h3 class="text-xl font-semibold mb-4 text-gray-800 flex items-center space-x-2">
+                             <i data-lucide="line-chart" class="w-5 h-5 text-primary-green"></i>
+                            <span>Calorías Acumuladas Recientes</span>
+                        </h3>
+                        <div class="h-64 sm:h-80">
+                            <canvas id="detailedProgressChart"></canvas>
+                        </div>
+                    </div>
+                    
+                    <!-- Historial de Registros -->
+                    <div class="lg:col-span-1 bg-white p-6 rounded-xl shadow-lg">
+                        <h3 class="text-xl font-semibold mb-4 text-gray-800 border-b pb-2 flex items-center space-x-2">
+                            <i data-lucide="history" class="w-5 h-5 text-gray-600"></i>
+                            <span>Historial de Comidas</span>
+                        </h3>
+                        <ul id="progress-meal-list" class="space-y-3 max-h-[500px] overflow-y-auto">
+                            <!-- Los registros se inyectan aquí por JS (renderProgress) -->
+                            <p class="text-gray-500 text-center py-4">Cargando historial...</p>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Vista 4: Planes (RUTINAS DE COMIDAS) -->
+            <div id="view-Planes" class="hidden">
+                <h2 class="text-3xl font-extrabold text-gray-900 mb-6">Planes y Rutinas de Comidas</h2>
+                <p class="text-gray-600 mb-8">Crea planes de comidas predefinidos para un registro rápido.</p>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <!-- Columna de Creación de Planes -->
+                    <div class="lg:col-span-1">
+                        <div class="bg-white p-6 rounded-xl shadow-2xl sticky top-24">
+                            <h3 class="text-xl font-bold text-warning-orange mb-4 border-b pb-2">Crear Nuevo Plan</h3>
+                            <form id="plan-form" onsubmit="submitPlan(event)">
+                                <div class="mb-4">
+                                    <label for="input-plan-name" class="block text-sm font-medium text-gray-700 mb-1">Nombre del Plan (Ej: Día de Entrenamiento)</label>
+                                    <input type="text" id="input-plan-name" required class="w-full p-3 border border-gray-300 rounded-lg focus:ring-warning-orange focus:border-warning-orange">
+                                </div>
+
+                                <h4 class="text-base font-semibold text-gray-700 mb-3">Comidas del Plan</h4>
+                                <div id="plan-meals-container" class="space-y-3 mb-4 border p-3 rounded-lg bg-bg-light/80">
+                                    <!-- Comidas del plan se inyectan aquí -->
+                                </div>
+                                <button type="button" onclick="addMealToPlanForm()" class="w-full p-2 bg-gray-200 text-gray-700 font-medium rounded-lg hover:bg-gray-300 transition duration-150 flex items-center justify-center space-x-2">
+                                    <i data-lucide="plus" class="w-5 h-5"></i>
+                                    <span>Añadir Comida</span>
+                                </button>
+                                
+                                <button type="submit" class="w-full p-3 bg-warning-orange text-white font-bold rounded-lg hover:bg-yellow-600 transition duration-200 shadow-xl shadow-warning-orange/40 flex items-center justify-center space-x-2 mt-6">
+                                    <i data-lucide="save" class="w-5 h-5"></i>
+                                    <span>Guardar Plan</span>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- Columna de Lista de Planes -->
+                    <div class="lg:col-span-2">
+                        <h3 class="text-xl font-bold text-gray-800 mb-4 border-b pb-2">Planes Guardados</h3>
+                        <div id="plans-list-container" class="space-y-4">
+                            <!-- Los planes guardados se inyectan aquí -->
+                            <div class="bg-white p-6 rounded-xl shadow-md text-center text-gray-500">
+                                <i data-lucide="target" class="w-8 h-8 text-gray-400 mx-auto mb-2"></i>
+                                <p>Aún no tienes planes de comidas guardados.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Vista 5: Perfil (Placeholder) -->
+            <div id="view-Perfil" class="hidden">
+                <h2 class="text-3xl font-extrabold text-gray-900 mb-6">Mi Perfil</h2>
+                <div class="max-w-md bg-white p-8 rounded-xl shadow-lg">
+                    <h3 class="text-xl font-semibold text-gray-800 mb-4">Información de Almacenamiento</h3>
+                    <p class="text-gray-600 mb-2 flex justify-between">
+                        <span class="font-medium">Tipo de Almacenamiento:</span> 
+                        <span class="text-primary-green font-bold">Local (Navegador)</span>
+                    </p>
+                    <p class="text-sm text-gray-500 mt-4 border-t pt-3">
+                        <i data-lucide="alert-triangle" class="w-4 h-4 inline mr-1 text-yellow-500"></i>
+                        Tus datos se guardan solo en este navegador. Si borras las cookies, perderás tu historial.
+                    </p>
+                </div>
+            </div>
+
+        </main>
+
+        <!-- Barra de Navegación Inferior (Móvil) -->
+        <footer class="sm:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-20 shadow-[0_-5px_10px_-3px_rgba(0,0,0,0.1)]">
+            <div class="flex justify-around items-center h-16 max-w-xl mx-auto">
+                <a id="mobile-nav-Inicio" href="#" onclick="event.preventDefault(); renderView('Inicio')" class="mobile-nav-item flex flex-col items-center justify-center text-gray-500 hover:text-primary-green transition duration-150">
+                    <i data-lucide="home" class="w-6 h-6"></i>
+                    <span class="text-xs font-medium mt-0.5">Inicio</span>
+                </a>
+                <a id="mobile-nav-Registro" href="#" onclick="event.preventDefault(); renderView('Registro')" class="mobile-nav-item flex flex-col items-center justify-center text-gray-500 hover:text-primary-green transition duration-150">
+                    <i data-lucide="plus-circle" class="w-6 h-6"></i>
+                    <span class="text-xs font-medium mt-0.5">Registro</span>
+                </a>
+                <a id="mobile-nav-Progreso" href="#" onclick="event.preventDefault(); renderView('Progreso')" class="mobile-nav-item flex flex-col items-center justify-center text-gray-500 hover:text-primary-green transition duration-150">
+                    <i data-lucide="trending-up" class="w-6 h-6"></i>
+                    <span class="text-xs font-medium mt-0.5">Progreso</span>
+                </a>
+                <a id="mobile-nav-Planes" href="#" onclick="event.preventDefault(); renderView('Planes')" class="mobile-nav-item flex flex-col items-center justify-center text-gray-500 hover:text-primary-green transition duration-150">
+                    <i data-lucide="target" class="w-6 h-6"></i>
+                    <span class="text-xs font-medium mt-0.5">Planes</span>
+                </a>
+                <a id="mobile-nav-Perfil" href="#" onclick="event.preventDefault(); renderView('Perfil')" class="mobile-nav-item flex flex-col items-center justify-center text-gray-500 hover:text-primary-green transition duration-150">
+                    <i data-lucide="user" class="w-6 h-6"></i>
+                    <span class="text-xs font-medium mt-0.5">Perfil</span>
+                </a>
+            </div>
+        </footer>
+
+    </div>
+    
+    <!-- Modal Personalizado para Mensajes y Confirmaciones (Reemplazo de alert/confirm) -->
+    <div id="custom-modal" class="fixed inset-0 bg-black bg-opacity-50 z-[100] hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm">
+            <div class="p-6">
+                <h3 id="modal-title" class="text-xl font-bold text-gray-800 mb-3">Título</h3>
+                <p id="modal-message" class="text-gray-600 mb-6">Mensaje del modal.</p>
+                <div class="flex justify-end space-x-3">
+                    <button id="modal-cancel-button" onclick="closeModal(false)" class="px-4 py-2 text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition duration-150 hidden">
+                        Cancelar
+                    </button>
+                    <button id="modal-confirm-button" onclick="closeModal(true)" class="px-4 py-2 bg-danger-red text-white font-medium rounded-lg hover:bg-red-600 transition duration-150 hidden">
+                        Confirmar
+                    </button>
+                    <button id="modal-ok-button" onclick="closeModal(true)" class="px-4 py-2 bg-primary-green text-white font-medium rounded-lg hover:bg-green-700 transition duration-150 hidden">
+                        Aceptar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Edición de Comida -->
+    <div id="edit-modal" class="fixed inset-0 bg-black bg-opacity-50 z-[90] hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-y-auto max-h-[95vh] transform transition-all duration-300 scale-100 opacity-100">
+            <div class="p-6 sm:p-8">
+                <h3 class="text-2xl font-bold text-success-blue mb-6 border-b pb-2 flex items-center space-x-2">
+                    <i data-lucide="edit-3" class="w-6 h-6"></i>
+                    <span>Editar Registro de Comida</span>
+                </h3>
+                
+                <form onsubmit="submitEditMeal(event)">
+                    
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                        <!-- Nombre del Plato -->
+                        <div>
+                            <label for="edit-food" class="block text-sm font-medium text-gray-700 mb-1">Nombre del Plato / Alimento</label>
+                            <input type="text" id="edit-food" name="food" required class="w-full p-3 border border-gray-300 rounded-lg focus:ring-success-blue focus:border-success-blue">
+                        </div>
+                        
+                        <!-- Tipo de Comida -->
+                        <div>
+                            <label for="edit-type" class="block text-sm font-medium text-gray-700 mb-1">Tipo de Comida</label>
+                            <select id="edit-type" name="type" required class="w-full p-3 border border-gray-300 rounded-lg focus:ring-success-blue focus:border-success-blue bg-white">
+                                <option value="Desayuno">Desayuno</option>
+                                <option value="Almuerzo">Almuerzo</option>
+                                <option value="Cena">Cena</option>
+                                <option value="Snack">Snack</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4 mb-6">
+                         <!-- Fecha -->
+                        <div>
+                            <label for="edit-date" class="block text-sm font-medium text-gray-700 mb-1 flex items-center"><i data-lucide="calendar" class="w-4 h-4 mr-2 text-success-blue"></i>Fecha</label>
+                            <input type="date" id="edit-date" name="date" required class="w-full p-3 border border-gray-300 rounded-lg focus:ring-success-blue focus:border-success-blue">
+                        </div>
+                        
+                        <!-- Hora -->
+                        <div>
+                            <label for="edit-time" class="block text-sm font-medium text-gray-700 mb-1 flex items-center"><i data-lucide="clock" class="w-4 h-4 mr-2 text-success-blue"></i>Hora</label>
+                            <input type="time" id="edit-time" name="time" required class="w-full p-3 border border-gray-300 rounded-lg focus:ring-success-blue focus:border-success-blue">
+                        </div>
+                    </div>
+                    
+                    <!-- Notas (Campo Opcional NUEVO en edición) -->
+                    <div class="mb-6">
+                        <label for="edit-note" class="block text-sm font-medium text-gray-700 mb-1">Notas (Opcional)</label>
+                        <textarea id="edit-note" name="note" rows="3" placeholder="Ej: Hecho con aceite de oliva." class="w-full p-3 border border-gray-300 rounded-lg focus:ring-success-blue focus:border-success-blue"></textarea>
+                    </div>
+
+                    <h3 class="text-lg font-bold text-success-blue border-t border-gray-200 pt-4 mt-4 mb-4">Detalles Nutricionales (Porciones en gramos)</h3>
+                    
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                        <!-- Calorías -->
+                        <div>
+                            <label for="edit-calories" class="block text-sm font-medium text-gray-700 mb-1">Calorías (kcal)</label>
+                            <input type="number" id="edit-calories" name="calories" required min="0" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-success-blue focus:border-success-blue bg-accent-light/50 font-bold text-gray-800">
+                        </div>
+                        <!-- Proteínas -->
+                        <div>
+                            <label for="edit-protein" class="block text-sm font-medium text-gray-700 mb-1">Proteínas (g)</label>
+                            <input type="number" id="edit-protein" name="protein" required min="0" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-success-blue focus:border-success-blue">
+                        </div>
+                        <!-- Grasas -->
+                        <div>
+                            <label for="edit-fat" class="block text-sm font-medium text-gray-700 mb-1">Grasas (g)</label>
+                            <input type="number" id="edit-fat" name="fat" required min="0" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-success-blue focus:border-success-blue">
+                        </div>
+                        <!-- Carbohidratos -->
+                        <div>
+                            <label for="edit-carbs" class="block text-sm font-medium text-gray-700 mb-1">Carbohidratos (g)</label>
+                            <input type="number" id="edit-carbs" name="carbs" required min="0" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-success-blue focus:border-success-blue">
+                        </div>
+                    </div>
+
+                    <div class="flex justify-end space-x-3 mt-6">
+                        <button type="button" onclick="closeEditModal()" class="px-4 py-2 text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition duration-150">
+                            Cancelar
+                        </button>
+                        <button type="submit" class="p-3 bg-success-blue text-white font-bold rounded-lg hover:bg-blue-700 transition duration-200 shadow-lg shadow-success-blue/40 flex items-center justify-center">
+                            <i data-lucide="save" class="w-5 h-5 mr-2"></i>
+                            Guardar Cambios
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+
+    <script type="module">
+        // Variables globales de estado de la aplicación
+        window.appState = {
+            currentView: 'Inicio',
+            isLoading: true,
+            meals: [], // Almacena el historial de comidas
+            macroCache: {}, // Almacena la caché de nutrientes por nombre de plato
+            plans: [], // NUEVO: Almacena los planes de comidas/rutinas
+            mealToEdit: null,
+            isApiOnline: false, // Estado de la conexión con la API
+        };
+
+        const MEALS_STORAGE_KEY = 'nutridiaria_meals';
+        const MACRO_CACHE_KEY = 'nutridiaria_macro_cache';
+        const PLANS_STORAGE_KEY = 'nutridiaria_plans'; // NUEVA CLAVE
+
+        // --- Funciones de Almacenamiento Local (localStorage) ---
+        const API_URL = 'http://192.168.1.137:8000/';
+
+        /** Carga el historial de comidas desde localStorage. */
+        function loadMealsFromLocalStorage() {
+            const data = localStorage.getItem(MEALS_STORAGE_KEY);
+            if (data) {
+                try {
+                    const meals = JSON.parse(data);
+                    // Asegurar que meals es un array y ordenar por timestamp
+                    window.appState.meals = Array.isArray(meals) 
+                        ? meals.sort((a, b) => b.timestamp - a.timestamp) 
+                        : [];
+                } catch (e) {
+                    console.error("Error al parsear comidas de localStorage:", e);
+                    window.appState.meals = [];
+                }
+            } else {
+                window.appState.meals = [];
+            }
+        }
+
+        /** Guarda el historial de comidas en localStorage. */
+        function saveMealsToLocalStorage() {
+            try {
+                // Ordenar por timestamp descendente antes de guardar
+                const sortedMeals = [...window.appState.meals].sort((a, b) => b.timestamp - a.timestamp);
+                localStorage.setItem(MEALS_STORAGE_KEY, JSON.stringify(sortedMeals));
+                window.appState.meals = sortedMeals; // Asegurar que el estado interno también esté ordenado
+            } catch (e) {
+                console.error("Error al guardar comidas en localStorage:", e);
+            }
+        }
+        
+        /** Carga la caché de macronutrientes desde localStorage. */
+        function loadMacrosFromLocalStorage() {
+            const data = localStorage.getItem(MACRO_CACHE_KEY);
+            if (data) {
+                try {
+                    window.appState.macroCache = JSON.parse(data);
+                } catch (e) {
+                    console.error("Error al parsear caché de macros:", e);
+                    window.appState.macroCache = {};
+                }
+            } else {
+                window.appState.macroCache = {};
+            }
+        }
+
+        /** Guarda la caché de macronutrientes en localStorage. */
+        function saveMacrosToLocalStorage() {
+             try {
+                localStorage.setItem(MACRO_CACHE_KEY, JSON.stringify(window.appState.macroCache));
+            } catch (e) {
+                console.error("Error al guardar caché de macros en localStorage:", e);
+            }
+        }
+
+        /** NUEVO: Carga los planes de comidas desde localStorage. */
+        function loadPlansFromLocalStorage() {
+            const data = localStorage.getItem(PLANS_STORAGE_KEY);
+            if (data) {
+                try {
+                    window.appState.plans = JSON.parse(data);
+                } catch (e) {
+                    console.error("Error al parsear planes de localStorage:", e);
+                    window.appState.plans = [];
+                }
+            } else {
+                window.appState.plans = [];
+            }
+        }
+
+        /** NUEVO: Guarda los planes de comidas en localStorage. */
+        function savePlansToLocalStorage() {
+            try {
+                localStorage.setItem(PLANS_STORAGE_KEY, JSON.stringify(window.appState.plans));
+            } catch (e) {
+                console.error("Error al guardar planes en localStorage:", e);
+            }
+        }
+
+        // --- Lógica de API y Sincronización ---
+
+        /** Comprueba el estado de la API y sincroniza los datos si vuelve a estar en línea. */
+        async function checkApiStatusAndSync() {
+            try {
+                // Usamos un endpoint simple como /status o /health. Si no existe, la API podría devolver 404 pero estar activa.
+                // Una petición GET a un endpoint conocido es suficiente.
+                const response = await fetch(API_URL + 'meals.json', { signal: AbortSignal.timeout(4000) });
+                
+                // Consideramos 'online' si la respuesta no es un error de red.
+                // Esto cubre respuestas 2xx, 4xx, 5xx, lo que significa que el servidor es accesible.
+                if (!window.appState.isApiOnline) {
+                    console.log("API connection established.");
+                    window.appState.isApiOnline = true;
+                    await syncLocalDataToApi();
+                }
+            } catch (error) {
+                if (window.appState.isApiOnline) {
+                    console.warn("API connection lost. Switching to local storage mode.");
+                }
+                window.appState.isApiOnline = false;
+            }
+            console.log(`Current mode: ${window.appState.isApiOnline ? 'API' : 'Local Storage'}`);
+        }
+
+        /** Sincroniza los datos locales (comidas y planes) con la API. */
+        async function syncLocalDataToApi() {
+            console.log("Attempting to sync local data to API...");
+            const localMeals = JSON.parse(localStorage.getItem(MEALS_STORAGE_KEY) || '[]');
+            const localPlans = JSON.parse(localStorage.getItem(PLANS_STORAGE_KEY) || '[]');
+
+            if (localMeals.length === 0 && localPlans.length === 0) {
+                console.log("No local data to sync.");
+                return;
+            }
+
+            try {
+                const response = await fetch(API_URL + 'sync.json', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ meals: localMeals, plans: localPlans })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`API sync failed with status: ${response.status}`);
+                }
+
+                const result = await response.json();
+                console.log("Sync successful:", result);
+
+                // Si la sincronización es exitosa, limpiamos el almacenamiento local
+                // para evitar reenvíos. La API es ahora la fuente de verdad.
+                localStorage.removeItem(MEALS_STORAGE_KEY);
+                localStorage.removeItem(PLANS_STORAGE_KEY);
+
+                // Recargamos los datos desde la API para tener el estado más reciente
+                await loadData(); 
+                
+            } catch (error) {
+                console.error("Error during data synchronization:", error);
+                // No limpiamos los datos locales si la sincronización falla.
+            }
+        }
+
+        /** Carga los datos iniciales, priorizando la API. */
+        async function loadData() {
+            if (window.appState.isApiOnline) {
+                try {
+                    console.log("Loading data from API...");
+                    const [mealsResponse, plansResponse] = await Promise.all([
+                        fetch(API_URL + 'meals.json'),
+                        fetch(API_URL + 'plans.json')
+                    ]);
+                    if (!mealsResponse.ok || !plansResponse.ok) throw new Error('Failed to fetch data from API');
+                    
+                    const meals = await mealsResponse.json();
+                    const plans = await plansResponse.json();
+
+                    window.appState.meals = Array.isArray(meals) ? meals.sort((a, b) => b.timestamp - a.timestamp) : [];
+                    window.appState.plans = plans || [];
+                    
+                } catch (error) {
+                    console.error("Failed to load from API, falling back to local storage.", error);
+                    loadMealsFromLocalStorage();
+                    loadPlansFromLocalStorage();
+                }
+            } else {
+                console.log("Loading data from Local Storage...");
+                loadMealsFromLocalStorage();
+                loadPlansFromLocalStorage();
+            }
+            loadMacrosFromLocalStorage(); // La caché de macros siempre es local
+        }
+
+        
+        // --- Funciones de Inicialización (Local Storage) ---
+
+        /** Función de carga inicial de datos locales y caché. */
+        async function initApp() {
+            await checkApiStatusAndSync(); // Comprueba el estado de la API
+            await loadData(); // Carga los datos desde la fuente apropiada
+
+            updateLoading(false); 
+            renderView(window.appState.currentView);
+            setInterval(checkApiStatusAndSync, 30000); // Comprueba la conexión cada 30 segundos
+        }
+
+        // --- Funciones de Lógica de la Aplicación ---
+        
+        // Función para generar un ID único (simplificado para local storage)
+        function generateUniqueId() {
+            return Date.now().toString(36) + Math.random().toString(36).substring(2);
+        }
+
+        // Función para cambiar la vista de la SPA
+        window.renderView = function(viewName) {
+            window.appState.currentView = viewName;
+            
+            // Ocultar todas las vistas y actualizar marcadores de navegación
+            const views = ['Inicio', 'Registro', 'Progreso', 'Planes', 'Perfil'];
+            views.forEach(view => {
+                document.getElementById(`view-${view}`).classList.add('hidden');
+                
+                // Limpiar estilos de navegación de escritorio
+                const navDesk = document.getElementById(`nav-${view}`);
+                navDesk.classList.remove('text-primary-green', 'border-b-2', 'border-primary-green', 'font-semibold');
+                navDesk.classList.add('text-gray-500', 'hover:text-primary-green', 'font-medium');
+                
+                // Limpiar estilos de navegación móvil
+                const navMobile = document.getElementById(`mobile-nav-${view}`);
+                navMobile.classList.replace('text-primary-green', 'text-gray-500');
+            });
+
+            // Mostrar la vista seleccionada y marcar la navegación
+            const targetView = document.getElementById(`view-${viewName}`);
+            const targetNavDesk = document.getElementById(`nav-${viewName}`);
+            const targetNavMobile = document.getElementById(`mobile-nav-${viewName}`);
+            
+            if (targetView) {
+                targetView.classList.remove('hidden');
+            }
+            if (targetNavDesk) {
+                targetNavDesk.classList.remove('text-gray-500', 'hover:text-primary-green', 'font-medium');
+                targetNavDesk.classList.add('text-primary-green', 'border-b-2', 'border-primary-green', 'font-semibold');
+            }
+            if (targetNavMobile) {
+                targetNavMobile.classList.replace('text-gray-500', 'text-primary-green');
+            }
+
+            // Llamar a la función de renderizado específica
+            if (viewName === 'Inicio') renderDashboard();
+            if (viewName === 'Progreso') renderProgress();
+            if (viewName === 'Planes') renderPlans(); // NUEVO: Renderizar planes
+            
+             // Forzar renderizado de iconos Lucide después de mostrar la vista
+            const { createIcons } = lucide; 
+            createIcons(); 
+        };
+
+        // Actualizar el estado de carga
+        function updateLoading(isLoading) {
+            window.appState.isLoading = isLoading;
+            document.getElementById('loading-indicator').classList.toggle('hidden', !isLoading);
+            document.getElementById('main-content').classList.toggle('hidden', isLoading);
+            if (isLoading) {
+                 document.getElementById('error-message').textContent = '';
+            }
+        }
+        
+        // --- Lógica Específica de Vistas y Gráficos ---
+
+        // Renderiza el Dashboard (Inicio)
+        function renderDashboard() {
+            if (window.appState.isLoading) return;
+            const meals = window.appState.meals;
+            const plans = window.appState.plans;
+
+            // 1. CÁLCULO DE MÉTRICAS CLAVE
+            const today = new Date().toISOString().slice(0, 10);
+            const mealsToday = meals.filter(m => {
+                const mealDate = m.timestamp ? new Date(m.timestamp).toISOString().slice(0, 10) : '';
+                return mealDate === today;
+            });
+
+            const totalCalories = mealsToday.reduce((sum, m) => sum + (m.calories || 0), 0);
+            const totalProtein = mealsToday.reduce((sum, m) => sum + (m.protein || 0), 0);
+            const totalFat = mealsToday.reduce((sum, m) => sum + (m.fat || 0), 0);
+            const totalCarbs = mealsToday.reduce((sum, m) => sum + (m.carbs || 0), 0);
+            
+            document.getElementById('metric-total-calories').textContent = totalCalories.toLocaleString('es-ES');
+            document.getElementById('metric-total-food').textContent = totalProtein.toLocaleString('es-ES'); 
+            document.getElementById('metric-total-fat').textContent = totalFat.toLocaleString('es-ES');
+            document.getElementById('metric-total-carbs').textContent = totalCarbs.toLocaleString('es-ES');
+
+            // 2. RUTINA RECOMENDADA PARA HOY (Si existe) o ÚLTIMA COMIDA
+            const latestMealContainer = document.getElementById('latest-meal-container');
+            const defaultPlan = plans[0]; // Usaremos el primer plan como "Recomendado para Hoy"
+
+            if (defaultPlan) {
+                // Mostrar el Plan/Rutina
+                const planTotalCalories = defaultPlan.meals.reduce((sum, m) => sum + (m.calories || 0), 0);
+                const planTotalProtein = defaultPlan.meals.reduce((sum, m) => sum + (m.protein || 0), 0);
+                const planTotalCarbs = defaultPlan.meals.reduce((sum, m) => sum + (m.carbs || 0), 0);
+                const planTotalFat = defaultPlan.meals.reduce((sum, m) => sum + (m.fat || 0), 0);
+
+                latestMealContainer.innerHTML = `
+                    <h2 class="text-lg sm:text-xl font-semibold mb-4 text-warning-orange border-b pb-2 flex items-center space-x-2">
+                        <i data-lucide="award" class="w-5 h-5 text-warning-orange"></i>
+                        <span>Rutina Recomendada: ${defaultPlan.name}</span>
+                    </h2>
+                    
+                    <div class="space-y-2 mb-4">
+                        ${defaultPlan.meals.map(m => `
+                            <div class="flex items-center justify-between text-sm p-2 bg-bg-light/80 rounded-lg">
+                                <p class="font-medium text-gray-700">${m.food} <span class="text-xs text-gray-500">(${m.type})</span></p>
+                                <p class="font-semibold text-primary-green">${m.calories} kcal</p>
+                            </div>
+                        `).join('')}
+                    </div>
+
+                    <div class="p-3 bg-warning-orange/10 rounded-xl mb-4">
+                        <p class="font-bold text-gray-800 text-center">Total del Plan</p>
+                        <div class="flex justify-between text-sm font-semibold mt-2">
+                            <span class="text-warning-orange">P: ${planTotalProtein}g</span>
+                            <span class="text-warning-orange">G: ${planTotalFat}g</span>
+                            <span class="text-warning-orange">C: ${planTotalCarbs}g</span>
+                            <span class="text-lg text-gray-900">${planTotalCalories} kcal</span>
+                        </div>
+                    </div>
+
+                    <button onclick="completePlan('${defaultPlan.id}')" class="w-full p-3 bg-warning-orange text-white font-bold rounded-lg hover:bg-yellow-600 transition duration-200 shadow-lg shadow-warning-orange/40 flex items-center justify-center space-x-2">
+                        <i data-lucide="check-circle-2" class="w-5 h-5"></i>
+                        <span>Completar Rutina Ahora</span>
+                    </button>
+                `;
+
+            } else {
+                // Si no hay planes, mostrar la última comida registrada
+                const latestMeal = meals.length > 0 ? meals[0] : null; // Ya están ordenadas
+                
+                if (latestMeal) {
+                    const date = new Date(latestMeal.timestamp);
+                    const timeStr = date.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+                    const dateStr = date.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'short' });
+
+                    latestMealContainer.innerHTML = `
+                        <h2 class="text-lg sm:text-xl font-semibold mb-4 text-gray-800 border-b pb-2 flex items-center space-x-2">
+                            <i data-lucide="clock" class="w-5 h-5 text-gray-500"></i>
+                            <span>Última Comida (${latestMeal.type})</span>
+                        </h2>
+                        <div class="w-full h-32 sm:h-40 bg-gray-200 rounded-xl overflow-hidden relative mb-4">
+                            <img src="https://placehold.co/400x160/10B981/ffffff?text=${latestMeal.food.toUpperCase().substring(0, 12)}..." onerror="this.onerror=null; this.src='https://placehold.co/400x160/10B981/ffffff?text=SIN+IMAGEN';" alt="Foto de la Comida" class="w-full h-full object-cover opacity-30">
+                            <div class="absolute inset-0 flex items-center justify-center">
+                                <i data-lucide="utensils" class="w-8 h-8 text-primary-green"></i>
+                            </div>
+                        </div>
+                        <div class="flex justify-between items-center mb-4">
+                            <div>
+                                <p class="text-xl sm:text-2xl font-bold text-gray-900">${latestMeal.calories || 0} <span class="text-sm sm:text-base font-medium text-primary-green">kcal</span></p>
+                                <p class="text-xs text-gray-500">Calorías</p>
+                            </div>
+                            <div class="text-center">
+                                <p class="text-xl sm:text-2xl font-bold text-gray-900">${latestMeal.protein || 0} <span class="text-sm sm:text-base font-medium text-primary-green">g</span></p>
+                                <p class="text-xs text-gray-500">Proteína</p>
+                            </div>
+                            <div>
+                                <p class="text-xl sm:text-2xl font-bold text-gray-900">${latestMeal.fat || 0} <span class="text-sm sm:text-base font-medium text-primary-green">g</span></p>
+                                <p class="text-xs text-gray-500">Grasa</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-3 pt-4 border-t border-gray-100">
+                            <img src="https://placehold.co/40x40/10B981/ffffff?text=U" alt="Usuario" class="w-10 h-10 rounded-full border-2 border-primary-green shadow-md shadow-primary-green/50">
+                            <div>
+                                <p class="text-sm font-semibold text-gray-800">Plato: ${latestMeal.food}</p>
+                                <p class="text-xs text-gray-500">${dateStr}, ${timeStr} ${latestMeal.note ? `| Nota: ${latestMeal.note}` : ''}</p>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    latestMealContainer.innerHTML = `
+                        <div class="bg-accent-light p-4 rounded-xl text-center text-primary-green font-medium">
+                            Aún no has registrado ninguna comida ni creado planes.
+                        </div>
+                    `;
+                }
+            }
+
+
+            // 3. DATOS DE GRÁFICOS
+            const summaryData = calculateWeeklySummary(meals);
+            const progressData = calculateProgress(meals);
+
+            createWeeklySummaryChart(summaryData.labels, summaryData.data);
+            createDetailedProgressChart(progressData.labels, progressData.data);
+            
+            // Forzar renderizado de iconos Lucide en el nuevo HTML inyectado
+            const { createIcons } = lucide; 
+            createIcons(); 
+        }
+
+        // Renderiza el Progreso (HISTORIAL DETALLADO)
+        function renderProgress() {
+            if (window.appState.isLoading) return;
+            const meals = window.appState.meals;
+            const mealList = document.getElementById('progress-meal-list');
+            
+            if (meals.length === 0) {
+                 mealList.innerHTML = `<p class="text-gray-500 p-4 text-center">No hay registros de comidas para mostrar en el historial.</p>`;
+                 return;
+            }
+
+            // Generar la lista de comidas
+            mealList.innerHTML = meals.map(m => {
+                const date = new Date(m.timestamp);
+                const dateStr = date.toLocaleDateString('es-ES', { year: 'numeric', month: 'short', day: 'numeric' });
+                const timeStr = date.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+                
+                // Mostrar la nota si existe
+                const noteDisplay = m.note ? `<p class="text-xs text-gray-500 italic mt-1 border-t border-gray-100 pt-1">Nota: ${m.note}</p>` : '';
+
+                return `
+                    <li class="p-4 bg-white rounded-xl shadow-sm flex justify-between items-center hover:bg-accent-light/50 transition duration-150 border-l-4 border-primary-green/50">
+                        <div class="flex flex-col flex-grow">
+                            <p class="font-semibold text-gray-800">${m.food} <span class="text-xs font-normal text-gray-500">(${m.type})</span></p>
+                            <p class="text-xs text-gray-600 mt-1">${dateStr} a las ${timeStr}</p>
+                            <p class="text-sm font-medium text-primary-green mt-2">
+                                ${m.calories} kcal | P: ${m.protein}g | G: ${m.fat}g | C: ${m.carbs}g
+                            </p>
+                            ${noteDisplay}
+                        </div>
+                        <!-- BOTONES DE ACCIÓN: EDITAR Y ELIMINAR -->
+                        <div class="flex space-x-2 ml-4">
+                            <button onclick="openEditModal('${m.id}')" class="text-success-blue hover:text-blue-700 transition duration-150 p-2 rounded-full hover:bg-blue-100" aria-label="Editar comida">
+                                <i data-lucide="edit-3" class="w-5 h-5"></i>
+                            </button>
+                            <button onclick="deleteMeal('${m.id}')" class="text-danger-red hover:text-red-700 transition duration-150 p-2 rounded-full hover:bg-red-100" aria-label="Eliminar comida">
+                                <i data-lucide="trash-2" class="w-5 h-5"></i>
+                            </button>
+                        </div>
+                    </li>
+                `;
+            }).join('');
+            
+            // Forzar renderizado de iconos Lucide
+            const { createIcons } = lucide; 
+            createIcons(); 
+        }
+
+        // --- LÓGICA DE PLANES (RUTINAS) ---
+        
+        /** Renderiza la vista de Planes, incluyendo el formulario y la lista de planes. */
+        function renderPlans() {
+            if (window.appState.isLoading) return;
+            renderPlanList(); // Muestra la lista de planes guardados
+            renderPlanForm(null); // Limpia el formulario
+            
+            // Forzar renderizado de iconos Lucide
+            const { createIcons } = lucide; 
+            createIcons(); 
+        }
+
+        /** Añade un grupo de campos de entrada para una comida al formulario de plan. */
+        window.addMealToPlanForm = function(meal = null) {
+            const container = document.getElementById('plan-meals-container');
+            const index = container.children.length;
+
+            const mealDiv = document.createElement('div');
+            mealDiv.className = 'p-3 border border-dashed border-gray-300 rounded-lg bg-white shadow-sm';
+            mealDiv.setAttribute('data-meal-index', index);
+            
+            const randomType = ['Desayuno', 'Almuerzo', 'Cena', 'Snack'][Math.floor(Math.random() * 4)];
+
+            mealDiv.innerHTML = `
+                <div class="flex justify-between items-center mb-2">
+                    <h5 class="font-semibold text-sm text-warning-orange">Comida #${index + 1}</h5>
+                    <button type="button" onclick="removeMealFromPlanForm(${index})" class="text-danger-red hover:text-red-700 p-1 rounded-full hover:bg-red-100" aria-label="Eliminar comida del plan">
+                        <i data-lucide="x" class="w-4 h-4"></i>
+                    </button>
+                </div>
+                <input type="text" placeholder="Nombre (Ej: Batido de Proteína)" name="plan-meal-food-${index}" value="${meal ? meal.food : ''}" required class="w-full p-2 mb-2 border border-gray-300 rounded-lg text-sm">
+                <select name="plan-meal-type-${index}" required class="w-full p-2 mb-2 border border-gray-300 rounded-lg text-sm bg-white">
+                    <option value="Desayuno" ${meal && meal.type === 'Desayuno' ? 'selected' : ''}>Desayuno</option>
+                    <option value="Almuerzo" ${meal && meal.type === 'Almuerzo' ? 'selected' : ''}>Almuerzo</option>
+                    <option value="Cena" ${meal && meal.type === 'Cena' ? 'selected' : ''}>Cena</option>
+                    <option value="Snack" ${meal && meal.type === 'Snack' ? 'selected' : ''}>Snack</option>
+                </select>
+                <div class="grid grid-cols-4 gap-2">
+                    <input type="number" placeholder="Kcal" name="plan-meal-calories-${index}" value="${meal ? meal.calories : ''}" required min="0" class="p-2 border border-gray-300 rounded-lg text-xs">
+                    <input type="number" placeholder="P (g)" name="plan-meal-protein-${index}" value="${meal ? meal.protein : ''}" required min="0" class="p-2 border border-gray-300 rounded-lg text-xs">
+                    <input type="number" placeholder="G (g)" name="plan-meal-fat-${index}" value="${meal ? meal.fat : ''}" required min="0" class="p-2 border border-gray-300 rounded-lg text-xs">
+                    <input type="number" placeholder="C (g)" name="plan-meal-carbs-${index}" value="${meal ? meal.carbs : ''}" required min="0" class="p-2 border border-gray-300 rounded-lg text-xs">
+                </div>
+            `;
+            container.appendChild(mealDiv);
+            
+             // Forzar renderizado de iconos Lucide en el nuevo elemento
+            const { createIcons } = lucide; 
+            createIcons(); 
+
+            // Si es un formulario nuevo, asegurar que siempre haya al menos uno
+            if (container.children.length === 1 && !meal) {
+                 // No hacer nada, solo forzar el renderizado de iconos si se llama sin argumentos.
+            }
+        }
+
+        /** Elimina una comida del formulario de plan. */
+        window.removeMealFromPlanForm = function(index) {
+            const container = document.getElementById('plan-meals-container');
+            const mealToRemove = container.querySelector(`[data-meal-index="${index}"]`);
+            if (mealToRemove) {
+                mealToRemove.remove();
+            }
+            // Reindexar después de la eliminación (simplificado, solo asegurar que el form.submit funcione)
+        }
+
+        /** Rellena/Limpia el formulario de planes. */
+        function renderPlanForm(plan = null) {
+            const container = document.getElementById('plan-meals-container');
+            container.innerHTML = '';
+            
+            document.getElementById('input-plan-name').value = plan ? plan.name : '';
+            document.getElementById('plan-form').setAttribute('data-edit-id', plan ? plan.id : '');
+
+            if (plan && Array.isArray(plan.meals)) {
+                plan.meals.forEach(meal => addMealToPlanForm(meal));
+            } else {
+                addMealToPlanForm(); // Añadir un campo por defecto si es nuevo
+            }
+        }
+        
+        /** Maneja la creación o actualización de un Plan. */
+        window.submitPlan = async function(event) {
+            event.preventDefault();
+            const form = event.target;
+            const editId = form.getAttribute('data-edit-id');
+            const planName = document.getElementById('input-plan-name').value.trim();
+            const mealsContainer = document.getElementById('plan-meals-container');
+            const mealsData = [];
+
+            if (!planName) {
+                showMessageModal("Error de Validación", "Por favor, ingresa un nombre para el plan.");
+                return;
+            }
+
+            // Recoger los datos de las comidas del plan
+            for (let i = 0; i < mealsContainer.children.length; i++) {
+                const mealDiv = mealsContainer.children[i];
+                
+                const food = mealDiv.querySelector(`[name="plan-meal-food-${i}"]`).value.trim();
+                const type = mealDiv.querySelector(`[name="plan-meal-type-${i}"]`).value;
+                const calories = parseInt(mealDiv.querySelector(`[name="plan-meal-calories-${i}"]`).value, 10);
+                const protein = parseInt(mealDiv.querySelector(`[name="plan-meal-protein-${i}"]`).value, 10);
+                const fat = parseInt(mealDiv.querySelector(`[name="plan-meal-fat-${i}"]`).value, 10);
+                const carbs = parseInt(mealDiv.querySelector(`[name="plan-meal-carbs-${i}"]`).value, 10);
+
+                if (!food || isNaN(calories) || isNaN(protein) || isNaN(fat) || isNaN(carbs)) {
+                    showMessageModal("Error de Validación", `Por favor, completa correctamente todos los campos para la Comida #${i + 1}.`);
+                    return;
+                }
+
+                mealsData.push({ food, type, calories, protein, fat, carbs });
+            }
+            
+            if (mealsData.length === 0) {
+                 showMessageModal("Error de Validación", "Un plan debe contener al menos una comida.");
+                 return;
+            }
+
+            if (editId) {
+                // Actualizar plan existente
+                if (window.appState.isApiOnline) {
+                    try {
+                        const response = await fetch(`${API_URL}plans/${editId}.json`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ name: planName, meals: mealsData })
+                        });
+                        if (!response.ok) throw new Error('API update failed');
+                    } catch (e) {
+                        console.error("API Error updating plan, saving locally:", e);
+                    }
+                }
+                const index = window.appState.plans.findIndex(p => p.id === editId);
+                if (index !== -1) {
+                    window.appState.plans[index] = { id: editId, name: planName, meals: mealsData };
+                    showMessageModal("Actualización Exitosa", `El plan "${planName}" ha sido actualizado.`);
+                }
+            } else {
+                // Crear nuevo plan
+                const newPlan = { id: generateUniqueId(), name: planName, meals: mealsData };
+                if (window.appState.isApiOnline) {
+                    try {
+                        const response = await fetch(API_URL + 'plans.json', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(newPlan)
+                        });
+                        if (!response.ok) throw new Error('API create failed');
+                    } catch (e) {
+                        console.error("API Error creating plan, saving locally:", e);
+                    }
+                }
+                window.appState.plans.push(newPlan);
+                showMessageModal("Creación Exitosa", `El plan "${planName}" ha sido creado y guardado.`);
+            }
+
+            savePlansToLocalStorage();
+            renderPlans(); // Recargar lista y limpiar formulario
+            renderDashboard(); // Actualizar dashboard con el posible plan por defecto
+        }
+
+        /** Elimina un Plan. */
+        window.deletePlan = async function(planId) {
+             const userConfirmed = await confirmModal("¿Estás seguro de que quieres eliminar este plan de comidas? Esta acción no se puede deshacer.");
+             if (!userConfirmed) return;
+
+             if (window.appState.isApiOnline) {
+                try {
+                    const response = await fetch(`${API_URL}plans/${planId}.json`, {
+                        method: 'DELETE'
+                    });
+                    if (!response.ok) throw new Error('API delete failed');
+                } catch (e) {
+                    console.error("API Error deleting plan, deleting locally:", e);
+                }
+             }
+
+
+             window.appState.plans = window.appState.plans.filter(p => p.id !== planId);
+             savePlansToLocalStorage();
+             showMessageModal("Eliminación Exitosa", "El plan ha sido eliminado.");
+             renderPlans();
+             renderDashboard();
+        }
+
+        /** Dibuja la lista de planes guardados. */
+        function renderPlanList() {
+            const container = document.getElementById('plans-list-container');
+            const plans = window.appState.plans;
+
+            if (plans.length === 0) {
+                 container.innerHTML = `
+                    <div class="bg-white p-6 rounded-xl shadow-md text-center text-gray-500">
+                        <i data-lucide="target" class="w-8 h-8 text-gray-400 mx-auto mb-2"></i>
+                        <p>Aún no tienes planes de comidas guardados. ¡Crea el primero!</p>
+                    </div>
+                `;
+                 return;
+            }
+
+            container.innerHTML = plans.map(plan => {
+                const totalCalories = plan.meals.reduce((sum, m) => sum + (m.calories || 0), 0);
+                const totalProtein = plan.meals.reduce((sum, m) => sum + (m.protein || 0), 0);
+
+                return `
+                    <div class="bg-white p-5 rounded-xl shadow-md border-l-4 border-warning-orange/70 hover:shadow-lg transition duration-150">
+                        <div class="flex justify-between items-start mb-3">
+                            <div>
+                                <h4 class="text-xl font-bold text-gray-800 flex items-center space-x-2">
+                                    <i data-lucide="award" class="w-5 h-5 text-warning-orange"></i>
+                                    <span>${plan.name}</span>
+                                </h4>
+                                <p class="text-sm text-gray-500 mt-1">${plan.meals.length} comidas en la rutina.</p>
+                            </div>
+                            <div class="flex space-x-2">
+                                <button onclick="renderPlanForm(window.appState.plans.find(p => p.id === '${plan.id}'))" class="text-success-blue hover:text-blue-700 p-2 rounded-full hover:bg-blue-100" aria-label="Editar plan">
+                                    <i data-lucide="edit-3" class="w-5 h-5"></i>
+                                </button>
+                                <button onclick="deletePlan('${plan.id}')" class="text-danger-red hover:text-red-700 p-2 rounded-full hover:bg-red-100" aria-label="Eliminar plan">
+                                    <i data-lucide="trash-2" class="w-5 h-5"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="flex justify-between items-center bg-bg-light p-3 rounded-lg mt-2">
+                            <p class="text-sm font-semibold text-gray-700">Total Calorías:</p>
+                            <p class="text-lg font-bold text-warning-orange">${totalCalories.toLocaleString('es-ES')} kcal</p>
+                        </div>
+                        <p class="text-xs text-gray-500 text-right mt-1">Proteína total: ${totalProtein}g</p>
+                    </div>
+                `;
+            }).join('');
+             // Forzar renderizado de iconos Lucide
+            const { createIcons } = lucide; 
+            createIcons(); 
+        }
+
+        /** NUEVO: Completa la rutina (plan) y la registra en el historial. */
+        window.completePlan = async function(planId) {
+            const plan = window.appState.plans.find(p => p.id === planId);
+            if (!plan) {
+                showMessageModal("Error", "No se encontró el plan para completar.");
+                return;
+            }
+            
+            const userConfirmed = await confirmModal(`¿Deseas registrar las ${plan.meals.length} comidas del plan "${plan.name}" en tu historial ahora mismo?`);
+            if (!userConfirmed) return;
+
+            const now = new Date();
+            const timestamp = now.getTime();
+            
+            let totalCaloriesRegistered = 0;
+
+            if (window.appState.isApiOnline) {
+                try {
+                    const response = await fetch(`${API_URL}plans/${planId}/complete.json`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ timestamp: now.toISOString() })
+                    });
+                    if (!response.ok) throw new Error('API complete plan failed');
+                } catch (e) {
+                    console.error("API Error completing plan, saving locally:", e);
+                }
+            }
+
+
+            plan.meals.forEach((meal, index) => {
+                // Crear un registro de comida para cada elemento del plan
+                const newMeal = {
+                    id: generateUniqueId(), 
+                    food: meal.food,
+                    type: meal.type,
+                    note: `[Rutina: ${plan.name}] - Comida #${index + 1}`, // Añadir nota de rutina
+                    calories: meal.calories || 0,
+                    protein: meal.protein || 0,
+                    fat: meal.fat || 0,
+                    carbs: meal.carbs || 0,
+                    timestamp: timestamp + index * 1000 // Asegurar un timestamp ligeramente diferente para el orden
+                };
+
+                // 1. Añadir al historial
+                window.appState.meals.push(newMeal);
+                totalCaloriesRegistered += newMeal.calories;
+
+                // 2. Actualizar caché de macros (siempre que se registre algo nuevo)
+                updateMacroCache(meal.food, meal.calories, meal.protein, meal.fat, meal.carbs);
+            });
+            
+            saveMealsToLocalStorage();
+
+            showMessageModal("Rutina Completada", `Se registraron ${plan.meals.length} comidas (${totalCaloriesRegistered} kcal) en tu historial.`);
+            
+            // Forzar re-renderizado de todas las vistas afectadas
+            renderDashboard(); 
+            renderProgress();
+        }
+
+        // --- Funciones de Caché y Autocompletado ---
+
+        /**
+         * Verifica la caché y autocompleta los campos de macronutrientes.
+         * @param {string} foodName Nombre del alimento a buscar.
+         */
+        window.autofillMacros = function(foodName) {
+            const normalizedName = foodName.trim().toLowerCase();
+            const cache = window.appState.macroCache;
+
+            if (cache[normalizedName]) {
+                const data = cache[normalizedName];
+                document.getElementById('input-calories').value = data.calories;
+                document.getElementById('input-protein').value = data.protein;
+                document.getElementById('input-fat').value = data.fat;
+                document.getElementById('input-carbs').value = data.carbs;
+                
+                console.log(`Autocompletado: ${foodName}`);
+            } else {
+                 // Si el usuario borra o cambia, se recomienda dejar los campos como estaban o limpiarlos
+                 // En este caso, solo limpiamos si el campo está vacío para no sobrescribir el input manual.
+                 if (normalizedName === "") {
+                    document.getElementById('input-calories').value = '';
+                    document.getElementById('input-protein').value = '';
+                    document.getElementById('input-fat').value = '';
+                    document.getElementById('input-carbs').value = '';
+                 }
+            }
+        }
+
+
+        /**
+         * Guarda los datos de macronutrientes de un plato en la caché.
+         * @param {string} food Nombre del plato.
+         * @param {number} calories Calorías.
+         * @param {number} protein Proteína.
+         * @param {number} fat Grasa.
+         * @param {number} carbs Carbohidratos.
+         */
+        function updateMacroCache(food, calories, protein, fat, carbs) {
+            const normalizedName = food.trim().toLowerCase();
+            window.appState.macroCache[normalizedName] = {
+                calories,
+                protein,
+                fat,
+                carbs
+            };
+            saveMacrosToLocalStorage();
+        }
+
+        // --- Funciones CRUD (Local Storage) ---
+
+        // Registrar una nueva comida (Create)
+        window.submitMeal = async function(event) {
+            event.preventDefault();
+            const form = event.target;
+            
+            const food = form.food.value.trim();
+            const type = form.type.value;
+            const date = form.date.value;
+            const time = form.time.value;
+            const note = form.note.value.trim(); // NUEVO CAMPO
+            const calories = parseInt(form.calories.value, 10);
+            const protein = parseInt(form.protein.value, 10);
+            const fat = parseInt(form.fat.value, 10);
+            const carbs = parseInt(form.carbs.value, 10);
+
+            if (!food || isNaN(calories) || isNaN(protein) || isNaN(fat) || isNaN(carbs)) {
+                showMessageModal("Error de Validación", "Por favor, completa todos los campos numéricos y el nombre de la comida correctamente.");
+                return;
+            }
+
+            const dateTimeString = `${date}T${time}:00`;
+            const timestamp = new Date(dateTimeString).getTime(); // Usar timestamp en milisegundos
+
+            const newMeal = {
+                id: generateUniqueId(), // ID único local
+                food,
+                type,
+                note, // Guardar la nota
+                calories: calories || 0,
+                protein: protein || 0,
+                fat: fat || 0,
+                carbs: carbs || 0,
+                timestamp 
+            };
+
+            if (window.appState.isApiOnline) {
+                try {
+                    const response = await fetch(API_URL + 'meals.json', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(newMeal)
+                    });
+                    if (!response.ok) throw new Error('API create failed');
+                } catch (e) {
+                    console.error("API Error creating meal, saving locally:", e);
+                }
+            }
+            // 1. Añadir al historial
+            window.appState.meals.push(newMeal);
+            saveMealsToLocalStorage();
+            
+            // 2. Actualizar caché de macros
+            updateMacroCache(food, newMeal.calories, newMeal.protein, newMeal.fat, newMeal.carbs);
+
+            showMessageModal("Registro Exitoso", `¡Comida "${food}" (${calories} kcal) registrada y datos guardados en caché!`);
+            
+            // Limpiar formulario y reestablecer fecha/hora
+            form.reset();
+            const now = new Date();
+            const dateStr = now.toISOString().slice(0, 10);
+            const timeStr = now.toTimeString().slice(0, 5);
+            document.getElementById('input-date').value = dateStr;
+            document.getElementById('input-time').value = timeStr;
+            
+            // Forzar re-renderizado
+            renderDashboard(); 
+            renderProgress();
+        };
+
+        // Eliminar una comida (Delete)
+        window.deleteMeal = async function(mealId) {
+             const userConfirmed = await confirmModal("¿Estás seguro de que quieres eliminar este registro de comida? Esta acción no se puede deshacer.");
+             if (!userConfirmed) return;
+
+             try {
+                 if (window.appState.isApiOnline) {
+                    try {
+                        const response = await fetch(`${API_URL}meals/${mealId}.json`, {
+                            method: 'DELETE'
+                        });
+                        if (!response.ok) throw new Error('API delete failed');
+                    } catch (e) {
+                        console.error("API Error deleting meal, deleting locally:", e);
+                    }
+                 }
+
+                 window.appState.meals = window.appState.meals.filter(m => m.id !== mealId);
+                 saveMealsToLocalStorage();
+                 
+                 console.log("Comida eliminada:", mealId);
+                 showMessageModal("Eliminación Exitosa", "El registro de comida ha sido eliminado.");
+                 
+                 // Forzar re-renderizado
+                 renderDashboard(); 
+                 renderProgress();
+             } catch (e) {
+                 console.error("Error al eliminar la comida:", e);
+                 showMessageModal("Error al eliminar", "No se pudo eliminar el registro. Inténtalo de nuevo.");
+             }
+        }
+
+        // --- Lógica de Edición (Update) ---
+        
+        /** Busca la comida por ID y abre el modal de edición precargado. */
+        window.openEditModal = function(mealId) {
+            const meal = window.appState.meals.find(m => m.id === mealId);
+            if (!meal) {
+                showMessageModal("Error", "No se encontró el registro de comida para editar.");
+                return;
+            }
+
+            window.appState.mealToEdit = meal; // Guardar la comida a editar en el estado
+
+            // Formatear Timestamp a Date y Time strings
+            const date = new Date(meal.timestamp);
+            const dateStr = date.toISOString().slice(0, 10);
+            const timeStr = date.toTimeString().slice(0, 5); 
+
+            // Precargar el formulario en el modal
+            document.getElementById('edit-food').value = meal.food;
+            document.getElementById('edit-type').value = meal.type;
+            document.getElementById('edit-date').value = dateStr;
+            document.getElementById('edit-time').value = timeStr;
+            document.getElementById('edit-note').value = meal.note || ''; // Cargar la nota
+            document.getElementById('edit-calories').value = meal.calories;
+            document.getElementById('edit-protein').value = meal.protein;
+            document.getElementById('edit-fat').value = meal.fat;
+            document.getElementById('edit-carbs').value = meal.carbs;
+
+            // Mostrar el modal de edición
+            document.getElementById('edit-modal').classList.remove('hidden');
+            
+            // Forzar renderizado de iconos Lucide en el modal
+            const { createIcons } = lucide; 
+            createIcons(); 
+        }
+
+        /** Maneja el envío del formulario de edición y actualiza los datos locales. */
+        window.submitEditMeal = async function(event) {
+            event.preventDefault();
+            const form = event.target;
+            const mealId = window.appState.mealToEdit?.id;
+
+            if (!mealId) {
+                showMessageModal("Error", "No se encontró la referencia del registro para actualizar.");
+                return;
+            }
+            
+            // Obtener valores del formulario de edición
+            const food = form.food.value.trim();
+            const type = form.type.value;
+            const date = form.date.value;
+            const time = form.time.value;
+            const note = form.note.value.trim(); // NUEVO CAMPO
+            const calories = parseInt(form.calories.value, 10);
+            const protein = parseInt(form.protein.value, 10);
+            const fat = parseInt(form.fat.value, 10);
+            const carbs = parseInt(form.carbs.value, 10);
+
+            // Validación simple
+            if (!food || isNaN(calories) || isNaN(protein) || isNaN(fat) || isNaN(carbs)) {
+                showMessageModal("Error de Validación", "Por favor, completa todos los campos numéricos y el nombre de la comida correctamente.");
+                return;
+            }
+
+            const dateTimeString = `${date}T${time}:00`;
+            const updatedTimestamp = new Date(dateTimeString).getTime();
+
+            const updatedMealData = {
+                id: mealId,
+                food,
+                type,
+                note,
+                calories: calories || 0,
+                protein: protein || 0,
+                fat: fat || 0,
+                carbs: carbs || 0,
+                timestamp: updatedTimestamp
+            };
+
+            try {
+                if (window.appState.isApiOnline) {
+                    try {
+                        const response = await fetch(`${API_URL}meals/${mealId}.json`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(updatedMealData)
+                        });
+                        if (!response.ok) throw new Error('API update failed');
+                    } catch (e) {
+                        console.error("API Error updating meal, saving locally:", e);
+                    }
+                }
+                // 1. Encontrar y reemplazar el objeto en el array
+                const index = window.appState.meals.findIndex(m => m.id === mealId);
+                if (index !== -1) {
+                    window.appState.meals[index] = updatedMealData;
+                    saveMealsToLocalStorage();
+                    // 2. Actualizar caché con los nuevos macros
+                    updateMacroCache(food, updatedMealData.calories, updatedMealData.protein, updatedMealData.fat, updatedMealData.carbs);
+                }
+
+                document.getElementById('edit-modal').classList.add('hidden');
+                showMessageModal("Actualización Exitosa", `¡Comida "${food}" (${calories} kcal) actualizada correctamente!`);
+                window.appState.mealToEdit = null;
+                
+                // Forzar re-renderizado
+                renderDashboard(); 
+                renderProgress();
+            } catch (e) {
+                console.error("Error al actualizar documento: ", e);
+                showMessageModal("Error", "No se pudo actualizar el registro de la comida. Inténtalo de nuevo.");
+            }
+        };
+
+        // Función para cerrar el modal de edición
+        window.closeEditModal = function() {
+            document.getElementById('edit-modal').classList.add('hidden');
+            window.appState.mealToEdit = null;
+        }
+
+
+        // --- Lógica de Gráficos (Chart.js) ---
+
+        let weeklyChartInstance = null;
+        let progressChartInstance = null;
+        const primaryGreen = '#10B981';
+        const lightGreen = '#A7F3D0'; 
+        const transparentGreen = 'rgba(16, 185, 129, 0.2)';
+
+        // Función de Cálculo para Resumen Semanal
+        function calculateWeeklySummary(meals) {
+            const daysOfWeek = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+            const dailySummary = {}; 
+
+            meals.forEach(meal => {
+                if (meal.timestamp) {
+                    const date = new Date(meal.timestamp);
+                    const dateKey = date.toISOString().slice(0, 10);
+                    const calories = meal.calories || 0;
+                    
+                    dailySummary[dateKey] = (dailySummary[dateKey] || 0) + calories;
+                }
+            });
+
+            // Obtener los últimos 7 días únicos con datos
+            const sortedDates = Object.keys(dailySummary).sort().slice(-7);
+            
+            const labels = [];
+            const data = [];
+
+            sortedDates.forEach(dateKey => {
+                const dayIndex = new Date(dateKey).getDay();
+                labels.push(daysOfWeek[dayIndex]);
+                data.push(dailySummary[dateKey]);
+            });
+
+            return { labels, data };
+        }
+        
+        // Función de Cálculo para Progreso (Calorías Acumuladas)
+        function calculateProgress(meals) {
+            const dailySummary = {};
+            meals.forEach(meal => {
+                if (meal.timestamp) {
+                    const date = new Date(meal.timestamp);
+                    const dateKey = date.toISOString().slice(0, 10);
+                    const calories = meal.calories || 0;
+                    dailySummary[dateKey] = (dailySummary[dateKey] || 0) + calories;
+                }
+            });
+
+            const sortedDates = Object.keys(dailySummary).sort();
+            // Tomar los últimos 12 días únicos (o menos)
+            const recentDates = sortedDates.slice(-12); 
+
+            const labels = [];
+            const data = [];
+            let cumulativeCalories = 0;
+
+            recentDates.forEach(dateKey => {
+                cumulativeCalories += dailySummary[dateKey];
+                const date = new Date(dateKey);
+                labels.push(date.toLocaleDateString('es-ES', { month: 'short', day: 'numeric' }));
+                data.push(cumulativeCalories);
+            });
+
+            return { labels, data };
+        }
+
+        /** Crea/Actualiza el gráfico de barras para el Resumen Semanal de Consumo */
+        function createWeeklySummaryChart(labels, data) {
+            const ctx = document.getElementById('weeklySummaryChart').getContext('2d');
+            
+            const datasets = [{
+                label: 'Calorías Consumidas (kcal)',
+                data: data,
+                backgroundColor: (context) => {
+                    const index = context.dataIndex;
+                    const lastIndex = data.length - 1;
+                    return index === lastIndex ? primaryGreen : lightGreen;
+                },
+                borderRadius: 6,
+            }];
+
+            if (weeklyChartInstance) {
+                weeklyChartInstance.data.labels = labels;
+                weeklyChartInstance.data.datasets = datasets;
+                weeklyChartInstance.update();
+            } else {
+                weeklyChartInstance = new Chart(ctx, {
+                    type: 'bar',
+                    data: { labels, datasets },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            x: { grid: { display: false } },
+                            y: {
+                                beginAtZero: true,
+                                grid: { color: '#f0f0f0' },
+                                ticks: { callback: (value) => value.toLocaleString('es-ES') + ' kcal' }
+                            }
+                        }
+                    }
+                });
+            }
+        }
+
+        /** Crea/Actualiza el gráfico de línea para el Progreso Detallado (Calorías Acumuladas) */
+        function createDetailedProgressChart(labels, data) {
+            const ctx = document.getElementById('detailedProgressChart').getContext('2d');
+            
+            const datasets = [{
+                label: 'Calorías Acumuladas (kcal)',
+                data: data,
+                borderColor: primaryGreen,
+                backgroundColor: transparentGreen, 
+                fill: true,
+                tension: 0.4,
+                pointBackgroundColor: primaryGreen,
+                pointRadius: 4,
+                pointHoverRadius: 6,
+            }];
+
+            if (progressChartInstance) {
+                progressChartInstance.data.labels = labels;
+                progressChartInstance.data.datasets = datasets;
+                progressChartInstance.update();
+            } else {
+                progressChartInstance = new Chart(ctx, {
+                    type: 'line',
+                    data: { labels, datasets },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: true, position: 'top' } },
+                        scales: {
+                            x: { grid: { display: false } },
+                            y: {
+                                beginAtZero: false,
+                                grid: { color: '#f0f0f0' },
+                                ticks: { callback: (value) => value.toLocaleString('es-ES') + ' kcal' }
+                            }
+                        }
+                    }
+                });
+            }
+        }
+
+        // --- Modales Personalizados (Reemplazo de alert/confirm) ---
+
+        let resolveModalPromise = null;
+
+        // Muestra un modal de mensaje (reemplazo de alert)
+        function showMessageModal(title, message) {
+            document.getElementById('modal-title').textContent = title;
+            document.getElementById('modal-message').textContent = message;
+            document.getElementById('modal-confirm-button').classList.add('hidden');
+            document.getElementById('modal-cancel-button').classList.add('hidden'); 
+            document.getElementById('modal-ok-button').classList.remove('hidden');
+            document.getElementById('custom-modal').classList.remove('hidden');
+        }
+
+        // Muestra un modal de confirmación (reemplazo de confirm)
+        function confirmModal(message) {
+            document.getElementById('modal-title').textContent = "Confirmación Requerida";
+            document.getElementById('modal-message').textContent = message;
+            document.getElementById('modal-ok-button').classList.add('hidden');
+            document.getElementById('modal-cancel-button').classList.remove('hidden'); 
+            document.getElementById('modal-confirm-button').classList.remove('hidden');
+            document.getElementById('custom-modal').classList.remove('hidden');
+
+            return new Promise(resolve => {
+                resolveModalPromise = resolve;
+            });
+        }
+
+        // Manejador del botón OK/Cancelar
+        window.closeModal = function(result) {
+            document.getElementById('custom-modal').classList.add('hidden');
+            if (resolveModalPromise) {
+                resolveModalPromise(result);
+                resolveModalPromise = null;
+            }
+        }
+
+
+        // --- Inicialización ---
+
+        window.onload = async function () { // Convertir a función async
+            // Establecer fecha y hora actual como valores por defecto en el formulario de registro
+            const now = new Date();
+            const dateStr = now.toISOString().slice(0, 10);
+            const timeStr = now.toTimeString().slice(0, 5);
+            document.getElementById('input-date').value = dateStr;
+            document.getElementById('input-time').value = timeStr;
+            
+            // Inicializar datos locales y cargar la vista
+            await initApp(); // Esperar a que la inicialización asíncrona termine
+        };
+        
+        // Asegurar que el formulario de Plan tenga al menos una comida al cargar
+        document.addEventListener('DOMContentLoaded', () => {
+             // Esto asegura que la función addMealToPlanForm esté disponible
+             if (document.getElementById('plan-meals-container')) {
+                 renderPlanForm(null);
+             }
+        });
+    </script>
+</body>
+</html>
