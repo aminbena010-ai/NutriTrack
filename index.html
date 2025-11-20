@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" class="h-full bg-bg-light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -38,7 +38,7 @@
 
     <style>
         /* Estilos base para la aplicación */
-        body {
+        body.app-bg {
             background-color: #f7f7f7;
             font-family: 'Arial', 'sans-serif';
         }
@@ -49,12 +49,54 @@
         ::-webkit-scrollbar {
             display: none;
         }
+        /* Estilos para la vista de autenticación */
+        .auth-bg {
+            background-color: #111827; /* Gris oscuro */
+        }
     </style>
 </head>
-<body>
+<body class="h-full">
+
+    <!-- Contenedor de Autenticación -->
+    <div id="auth-container" class="min-h-full flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 hidden">
+        <div class="max-w-md w-full space-y-8">
+            <div>
+                <div class="flex items-center justify-center space-x-2">
+                    <i data-lucide="leaf" class="w-12 h-12 text-primary-green"></i>
+                </div>
+                <h2 id="auth-title" class="mt-6 text-center text-3xl font-extrabold text-gray-900">Inicia sesión en tu cuenta</h2>
+            </div>
+            <form id="login-form" class="mt-8 space-y-6" onsubmit="handleLogin(event)">
+                <input type="hidden" name="remember" value="true">
+                <div class="rounded-md shadow-sm -space-y-px">
+                    <div>
+                        <label for="login-username" class="sr-only">Usuario</label>
+                        <input id="login-username" name="username" type="text" autocomplete="username" required class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-primary-green focus:border-primary-green focus:z-10 sm:text-sm" placeholder="Nombre de usuario">
+                    </div>
+                    <div>
+                        <label for="login-password" class="sr-only">Contraseña</label>
+                        <input id="login-password" name="password" type="password" autocomplete="current-password" required class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-primary-green focus:border-primary-green focus:z-10 sm:text-sm" placeholder="Contraseña">
+                    </div>
+                </div>
+                <div>
+                    <button type="submit" class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-primary-green hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-green">
+                        Iniciar Sesión
+                    </button>
+                </div>
+            </form>
+             <p id="auth-error" class="mt-2 text-center text-sm text-danger-red"></p>
+            <p class="mt-2 text-center text-sm text-gray-600">
+                ¿No tienes cuenta?
+                <a href="#" id="toggle-auth-link" onclick="toggleAuthView(event)" class="font-medium text-primary-green hover:text-green-700">
+                    Regístrate aquí
+                </a>
+            </p>
+        </div>
+    </div>
+
 
     <!-- Contenedor Principal de la Aplicación -->
-    <div id="app-container" class="relative">
+    <div id="app-container" class="relative hidden">
 
         <!-- Barra de Navegación Superior (Escritorio) -->
         <header class="bg-white shadow-sm sticky top-0 z-10 hidden sm:block">
@@ -70,7 +112,9 @@
                     <a id="nav-Progreso" href="#" onclick="event.preventDefault(); renderView('Progreso')" class="text-gray-500 hover:text-primary-green transition duration-150 py-2 border-b-2 border-transparent">Progreso</a>
                     <a id="nav-Planes" href="#" onclick="event.preventDefault(); renderView('Planes')" class="text-gray-500 hover:text-primary-green transition duration-150 py-2 border-b-2 border-transparent">Planes</a>
                     <a id="nav-Perfil" href="#" onclick="event.preventDefault(); renderView('Perfil')" class="text-gray-500 hover:text-primary-green transition duration-150 py-2 border-b-2 border-transparent">Perfil</a>
+                    <a href="#" onclick="event.preventDefault(); handleLogout()" class="text-danger-red hover:text-red-700 transition duration-150 py-2 border-b-2 border-transparent font-semibold">Cerrar Sesión</a>
                 </nav>
+                <p class="text-sm text-gray-500">Usuario: <span id="username-display" class="font-bold"></span></p>
             </div>
         </header>
 
@@ -78,7 +122,7 @@
         <div id="loading-indicator" class="fixed inset-0 bg-bg-light z-50 flex items-center justify-center hidden">
             <div class="flex flex-col items-center">
                 <i data-lucide="loader-circle" class="w-10 h-10 text-primary-green animate-spin"></i>
-                <p class="mt-4 text-gray-600 font-medium">Cargando datos locales...</p>
+                <p class="mt-4 text-gray-600 font-medium">Cargando datos...</p>
                 <p id="error-message" class="mt-2 text-danger-red text-sm"></p>
             </div>
         </div>
@@ -322,6 +366,10 @@
                         <i data-lucide="alert-triangle" class="w-4 h-4 inline mr-1 text-yellow-500"></i>
                         Tus datos se guardan solo en este navegador. Si borras las cookies, perderás tu historial.
                     </p>
+                     <p id="api-status-indicator" class="text-sm text-gray-500 mt-4 border-t pt-3">
+                        <i data-lucide="wifi" class="w-4 h-4 inline mr-1 text-gray-400"></i>
+                        Estado de la API: <span class="font-bold">Desconocido</span>
+                    </p>
                 </div>
             </div>
 
@@ -476,11 +524,14 @@
             plans: [], // NUEVO: Almacena los planes de comidas/rutinas
             mealToEdit: null,
             isApiOnline: false, // Estado de la conexión con la API
+            token: null, // Token de autenticación JWT
+            currentUser: null // Nombre del usuario actual
         };
 
         const MEALS_STORAGE_KEY = 'nutridiaria_meals';
         const MACRO_CACHE_KEY = 'nutridiaria_macro_cache';
         const PLANS_STORAGE_KEY = 'nutridiaria_plans'; // NUEVA CLAVE
+        const AUTH_TOKEN_KEY = 'nutridiaria_auth_token';
 
         // --- Funciones de Almacenamiento Local (localStorage) ---
         const API_URL = 'http://192.168.1.137:8000/';
@@ -564,12 +615,22 @@
             }
         }
 
+        // --- Funciones de Autenticación ---
+        function getAuthHeaders() {
+            return {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${window.appState.token}`
+            };
+        }
+
         // --- Lógica de API y Sincronización ---
 
         /** Comprueba el estado de la API y sincroniza los datos si vuelve a estar en línea. */
         async function checkApiStatusAndSync() {
+            const apiStatusIndicator = document.getElementById('api-status-indicator');
+            const statusText = apiStatusIndicator.querySelector('span');
             try {
-                // Usamos un endpoint simple como /status o /health. Si no existe, la API podría devolver 404 pero estar activa.
+                // Usamos un endpoint que no requiere autenticación para la prueba inicial.
                 // Una petición GET a un endpoint conocido es suficiente.
                 const response = await fetch(API_URL + 'meals.json', { signal: AbortSignal.timeout(4000) });
                 
@@ -578,15 +639,20 @@
                 if (!window.appState.isApiOnline) {
                     console.log("API connection established.");
                     window.appState.isApiOnline = true;
+                    statusText.textContent = 'En línea';
+                    statusText.className = 'font-bold text-primary-green';
                     await syncLocalDataToApi();
                 }
             } catch (error) {
                 if (window.appState.isApiOnline) {
                     console.warn("API connection lost. Switching to local storage mode.");
                 }
+                statusText.textContent = 'Fuera de línea';
+                statusText.className = 'font-bold text-danger-red';
                 window.appState.isApiOnline = false;
             }
             console.log(`Current mode: ${window.appState.isApiOnline ? 'API' : 'Local Storage'}`);
+            lucide.createIcons();
         }
 
         /** Sincroniza los datos locales (comidas y planes) con la API. */
@@ -603,7 +669,7 @@
             try {
                 const response = await fetch(API_URL + 'sync.json', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: getAuthHeaders(),
                     body: JSON.stringify({ meals: localMeals, plans: localPlans })
                 });
 
@@ -634,8 +700,8 @@
                 try {
                     console.log("Loading data from API...");
                     const [mealsResponse, plansResponse] = await Promise.all([
-                        fetch(API_URL + 'meals.json'),
-                        fetch(API_URL + 'plans.json')
+                        fetch(API_URL + 'meals.json', { headers: getAuthHeaders() }),
+                        fetch(API_URL + 'plans.json', { headers: getAuthHeaders() })
                     ]);
                     if (!mealsResponse.ok || !plansResponse.ok) throw new Error('Failed to fetch data from API');
                     
@@ -663,12 +729,81 @@
 
         /** Función de carga inicial de datos locales y caché. */
         async function initApp() {
-            await checkApiStatusAndSync(); // Comprueba el estado de la API
-            await loadData(); // Carga los datos desde la fuente apropiada
+            updateLoading(true);
+            const token = localStorage.getItem(AUTH_TOKEN_KEY);
+            if (token) {
+                window.appState.token = token;
+                try {
+                    // Verificar si el token es válido pidiendo los datos del usuario
+                    const response = await fetch(API_URL + 'users/me', { headers: getAuthHeaders() });
+                    if (!response.ok) {
+                        throw new Error('Token inválido o expirado');
+                    }
+                    const user = await response.json();
+                    window.appState.currentUser = user.username;
+                    
+                    // Si el token es válido, mostrar la app principal
+                    document.body.classList.add('app-bg');
+                    document.getElementById('app-container').classList.remove('hidden');
+                    document.getElementById('username-display').textContent = user.username;
 
-            updateLoading(false); 
-            renderView(window.appState.currentView);
-            setInterval(checkApiStatusAndSync, 30000); // Comprueba la conexión cada 30 segundos
+                    await checkApiStatusAndSync();
+                    await loadData();
+                    updateLoading(false);
+                    renderView(window.appState.currentView);
+                    setInterval(checkApiStatusAndSync, 30000);
+
+                } catch (error) {
+                    console.error("Error de autenticación:", error);
+                    handleLogout(); // Limpia el token inválido y muestra la vista de login
+                }
+            } else {
+                // Si no hay token, mostrar la vista de autenticación
+                showAuthView();
+            }
+        }
+
+        function showAuthView(isLogin = true) {
+            updateLoading(false);
+            document.body.classList.remove('app-bg');
+            document.getElementById('app-container').classList.add('hidden');
+            document.getElementById('auth-container').classList.remove('hidden');
+            
+            const title = document.getElementById('auth-title');
+            const form = document.getElementById('login-form');
+            const toggleLink = document.getElementById('toggle-auth-link');
+
+            if (isLogin) {
+                title.textContent = 'Inicia sesión en tu cuenta';
+                form.onsubmit = handleLogin;
+                form.querySelector('button').textContent = 'Iniciar Sesión';
+                toggleLink.textContent = 'Regístrate aquí';
+            } else {
+                title.textContent = 'Crea una nueva cuenta';
+                form.onsubmit = handleRegister;
+                form.querySelector('button').textContent = 'Registrar';
+                toggleLink.textContent = 'Ya tengo una cuenta';
+            }
+            document.getElementById('auth-error').textContent = '';
+        }
+
+        window.toggleAuthView = function(event) {
+            event.preventDefault();
+            const isLoginView = document.getElementById('auth-title').textContent.includes('Inicia sesión');
+            showAuthView(!isLoginView);
+        }
+
+        window.handleLogout = function() {
+            window.appState.token = null;
+            window.appState.currentUser = null;
+            window.appState.meals = [];
+            window.appState.plans = [];
+            localStorage.removeItem(AUTH_TOKEN_KEY);
+            localStorage.removeItem(MEALS_STORAGE_KEY);
+            localStorage.removeItem(PLANS_STORAGE_KEY);
+            // Detener el intervalo de chequeo de API si existe
+            // (simplificado: simplemente recargamos la página para un estado limpio)
+            window.location.reload();
         }
 
         // --- Funciones de Lógica de la Aplicación ---
@@ -1038,7 +1173,7 @@
                     try {
                         const response = await fetch(`${API_URL}plans/${editId}.json`, {
                             method: 'PUT',
-                            headers: { 'Content-Type': 'application/json' },
+                            headers: getAuthHeaders(),
                             body: JSON.stringify({ name: planName, meals: mealsData })
                         });
                         if (!response.ok) throw new Error('API update failed');
@@ -1058,7 +1193,7 @@
                     try {
                         const response = await fetch(API_URL + 'plans.json', {
                             method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
+                            headers: getAuthHeaders(),
                             body: JSON.stringify(newPlan)
                         });
                         if (!response.ok) throw new Error('API create failed');
@@ -1083,7 +1218,8 @@
              if (window.appState.isApiOnline) {
                 try {
                     const response = await fetch(`${API_URL}plans/${planId}.json`, {
-                        method: 'DELETE'
+                        method: 'DELETE',
+                        headers: getAuthHeaders()
                     });
                     if (!response.ok) throw new Error('API delete failed');
                 } catch (e) {
@@ -1170,7 +1306,7 @@
                 try {
                     const response = await fetch(`${API_URL}plans/${planId}/complete.json`, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: getAuthHeaders(),
                         body: JSON.stringify({ timestamp: now.toISOString() })
                     });
                     if (!response.ok) throw new Error('API complete plan failed');
@@ -1302,7 +1438,7 @@
                 try {
                     const response = await fetch(API_URL + 'meals.json', {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: getAuthHeaders(),
                         body: JSON.stringify(newMeal)
                     });
                     if (!response.ok) throw new Error('API create failed');
@@ -1341,7 +1477,8 @@
                  if (window.appState.isApiOnline) {
                     try {
                         const response = await fetch(`${API_URL}meals/${mealId}.json`, {
-                            method: 'DELETE'
+                            method: 'DELETE',
+                            headers: getAuthHeaders()
                         });
                         if (!response.ok) throw new Error('API delete failed');
                     } catch (e) {
@@ -1448,7 +1585,7 @@
                     try {
                         const response = await fetch(`${API_URL}meals/${mealId}.json`, {
                             method: 'PUT',
-                            headers: { 'Content-Type': 'application/json' },
+                            headers: getAuthHeaders(),
                             body: JSON.stringify(updatedMealData)
                         });
                         if (!response.ok) throw new Error('API update failed');
@@ -1674,23 +1811,69 @@
 
         // --- Inicialización ---
 
-        window.onload = async function () { // Convertir a función async
-            // Establecer fecha y hora actual como valores por defecto en el formulario de registro
-            const now = new Date();
-            const dateStr = now.toISOString().slice(0, 10);
-            const timeStr = now.toTimeString().slice(0, 5);
-            document.getElementById('input-date').value = dateStr;
-            document.getElementById('input-time').value = timeStr;
-            
-            // Inicializar datos locales y cargar la vista
-            await initApp(); // Esperar a que la inicialización asíncrona termine
+        window.handleLogin = async function(event) {
+            event.preventDefault();
+            const form = event.target;
+            const formData = new FormData();
+            formData.append('username', form.username.value);
+            formData.append('password', form.password.value);
+
+            try {
+                const response = await fetch(API_URL + 'token', {
+                    method: 'POST',
+                    body: new URLSearchParams(formData)
+                });
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || 'Error al iniciar sesión');
+                }
+                const data = await response.json();
+                localStorage.setItem(AUTH_TOKEN_KEY, data.access_token);
+                window.location.reload(); // Recargar para iniciar la app
+            } catch (error) {
+                document.getElementById('auth-error').textContent = error.message;
+            }
+        }
+
+        window.handleRegister = async function(event) {
+            event.preventDefault();
+            const form = event.target;
+            const formData = new FormData();
+            formData.append('username', form.username.value);
+            formData.append('password', form.password.value);
+
+            try {
+                const response = await fetch(API_URL + 'register', {
+                    method: 'POST',
+                    body: new URLSearchParams(formData)
+                });
+                 if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || 'Error en el registro');
+                }
+                await response.json();
+                showMessageModal("Registro Exitoso", "Tu cuenta ha sido creada. Ahora puedes iniciar sesión.");
+                showAuthView(true); // Volver a la vista de login
+            } catch (error) {
+                document.getElementById('auth-error').textContent = error.message;
+            }
+        }
+
+        window.onload = async function () {
+            // Inicializar la aplicación (comprobará el token)
+            await initApp();
         };
         
         // Asegurar que el formulario de Plan tenga al menos una comida al cargar
         document.addEventListener('DOMContentLoaded', () => {
              // Esto asegura que la función addMealToPlanForm esté disponible
              if (document.getElementById('plan-meals-container')) {
-                 renderPlanForm(null);
+                const now = new Date();
+                const dateStr = now.toISOString().slice(0, 10);
+                const timeStr = now.toTimeString().slice(0, 5);
+                document.getElementById('input-date').value = dateStr;
+                document.getElementById('input-time').value = timeStr;
+                renderPlanForm(null);
              }
         });
     </script>
